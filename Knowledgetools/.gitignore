@@ -1,0 +1,19 @@
+node_modules/
+*.log
+.DS_Store
+output/
+coverage/
+.env
+
+# Data directories
+data/
+temp/
+*.xlsx
+
+# Configs
+configs/gitlab.json
+configs/github.json
+configs/mcp.json
+
+# OS files
+Thumbs.db
