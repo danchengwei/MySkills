@@ -2972,9 +2972,6 @@ async function analyzeCrash(
     }
   }
   
-  markdownContent += `> - **错误率**: ${errorRate}\n`;
-  markdownContent += `> - **首现版本**: ${FirstVersion || '-'}\n`;
-  
   // 获取崩溃详情
   let crashDetail: any = null;
   if (DigestHash) {
@@ -2985,17 +2982,25 @@ async function analyzeCrash(
     }
   }
   
+  // 优先使用crashDetail中的数据
+  const detail = crashDetail?.Model;
+  const effectiveFirstVersion = detail?.FirstVersion || FirstVersion;
+  const effectiveLatestTime = detail?.LatestTime;
+  const effectiveFirstTime = detail?.FirstTime;
+  
+  markdownContent += `> - **错误率**: ${errorRate}\n`;
+  markdownContent += `> - **首现版本**: ${effectiveFirstVersion || '-'}\n`;
+  
   // 崩溃详情补充信息 - 保持格式一致性
-  if (crashDetail?.Model) {
-    const detail = crashDetail.Model;
+  if (detail) {
     if (detail.ErrorVersionCount) {
       markdownContent += `> - **影响版本**: ${detail.ErrorVersionCount} 个版本\n`;
     }
-    if (detail.LatestTime) {
-      markdownContent += `> - **最近时间**: ${detail.LatestTime}\n`;
+    if (effectiveLatestTime) {
+      markdownContent += `> - **最近时间**: ${effectiveLatestTime}\n`;
     }
-    if (detail.FirstTime) {
-      markdownContent += `> - **首次时间**: ${detail.FirstTime}\n`;
+    if (effectiveFirstTime) {
+      markdownContent += `> - **首次时间**: ${effectiveFirstTime}\n`;
     }
     if (detail.Name) {
       markdownContent += `> - **错误名称**: ${detail.Name}\n`;
@@ -3038,9 +3043,9 @@ async function analyzeCrash(
   markdownContent += `| 版本 | ${versionColumnLabel} | 占比 |\n`;
   markdownContent += `|------|---------|------|\n`;
   
-  // 检查是否有版本分布数据
-  if (crashDetail?.Model?.VersionDistribution) {
-    const versionDist = crashDetail.Model.VersionDistribution;
+  // 检查是否有版本分布数据 - 优先使用crashDetail中的数据
+  if (detail?.VersionDistribution) {
+    const versionDist = detail.VersionDistribution;
     const totalVersionCrashes = versionDist.reduce((sum: number, item: any) => sum + (item.Count || 0), 0);
     
     // 按崩溃次数排序
@@ -3052,18 +3057,18 @@ async function analyzeCrash(
       markdownContent += `| ${item.Version || 'Unknown'} | ${count} | ${percentage}% |\n`;
     }
   } else {
-    markdownContent += `| ${FirstVersion || 'Unknown'} | ${ErrorCount || 0} | 100.00% |\n`;
+    markdownContent += `| ${effectiveFirstVersion || 'Unknown'} | ${ErrorCount || 0} | 100.00% |\n`;
   }
   markdownContent += `\n`;
   
   // 详细版本分析
-  if (!isPerformanceAnalysis && FirstVersion) {
+  if (!isPerformanceAnalysis && effectiveFirstVersion) {
     const now = new Date();
-    const firstSeen = new Date(crashDetail?.Model?.FirstTime || now);
+    const firstSeen = new Date(effectiveFirstTime || now);
     const daysSinceFirstSeen = Math.floor((now.getTime() - firstSeen.getTime()) / (1000 * 60 * 60 * 24));
     
     // 获取整个应用的最新版本
-    let appLatestVersion = FirstVersion;
+    let appLatestVersion = effectiveFirstVersion;
     try {
       const versionResult = await getIssues(appKey, 'crash', startDate, endDate, config, '20');
       if (versionResult.Model?.Items && versionResult.Model.Items.length > 0) {
@@ -3101,16 +3106,16 @@ async function analyzeCrash(
     
     markdownContent += `### 📊 版本分析\n`;
     markdownContent += `> **版本分析**\n`;
-    markdownContent += `> - 首现版本: ${FirstVersion}\n`;
+    markdownContent += `> - 首现版本: ${effectiveFirstVersion}\n`;
     markdownContent += `> - 应用最新版本: ${appLatestVersion}\n`;
     
-    if (crashDetail?.Model?.FirstTime) {
-      markdownContent += `> - 首次出现时间: ${crashDetail.Model.FirstTime}\n`;
+    if (effectiveFirstTime) {
+      markdownContent += `> - 首次出现时间: ${effectiveFirstTime}\n`;
     }
-    if (crashDetail?.Model?.LatestTime) {
-      markdownContent += `> - 最近出现时间: ${crashDetail.Model.LatestTime}\n`;
+    if (effectiveLatestTime) {
+      markdownContent += `> - 最近出现时间: ${effectiveLatestTime}\n`;
     }
-    markdownContent += `> - 存在天数: ${daysSinceFirstSeen} 天\n`;
+
     
     // 比较版本的辅助函数
     const compareVersions = (v1: string, v2: string): number => {
@@ -3152,32 +3157,32 @@ async function analyzeCrash(
         markdownContent += `> - 最早影响版本: ${oldestVersion}\n`;
         
         // 判断问题类型
-        const isFirstVersionLatest = compareVersions(FirstVersion, appLatestVersion) === 0;
-        const isFirstVersionOlder = compareVersions(FirstVersion, appLatestVersion) < 0;
+        const isFirstVersionLatest = compareVersions(effectiveFirstVersion, appLatestVersion) === 0;
+        const isFirstVersionOlder = compareVersions(effectiveFirstVersion, appLatestVersion) < 0;
         
         if (isFirstVersionLatest && daysSinceFirstSeen <= 7) {
-          markdownContent += `> - 🔴 **这是一个新问题**: 首现于最新版本 ${FirstVersion}，且在最近7天内出现\n`;
+          markdownContent += `> - 🔴 **这是一个新问题**: 首现于最新版本 ${effectiveFirstVersion}，且在最近7天内出现\n`;
         } else if (isFirstVersionLatest && daysSinceFirstSeen <= 30) {
-          markdownContent += `> - 🟡 **这是一个较新问题**: 首现于最新版本 ${FirstVersion}，约 ${daysSinceFirstSeen} 天前\n`;
+          markdownContent += `> - 🟡 **这是一个较新问题**: 首现于最新版本 ${effectiveFirstVersion}，约 ${daysSinceFirstSeen} 天前\n`;
         } else if (isFirstVersionOlder) {
-          markdownContent += `> - 🟢 **这是一个老问题**: 首现于 ${FirstVersion}，应用最新版本为 ${appLatestVersion}\n`;
+          markdownContent += `> - 🟢 **这是一个老问题**: 首现于 ${effectiveFirstVersion}，应用最新版本为 ${appLatestVersion}\n`;
         } else {
-          markdownContent += `> - ⏳ **这是一个历史问题**: 首现于 ${FirstVersion}，已存在 ${daysSinceFirstSeen} 天\n`;
+          markdownContent += `> - ⏳ **这是一个历史问题**: 首现于 ${effectiveFirstVersion}，已存在 ${daysSinceFirstSeen} 天\n`;
         }
       }
     } else {
       // 只有一个版本的情况
-      const isFirstVersionLatest = compareVersions(FirstVersion, appLatestVersion) === 0;
-      const isFirstVersionOlder = compareVersions(FirstVersion, appLatestVersion) < 0;
+      const isFirstVersionLatest = compareVersions(effectiveFirstVersion, appLatestVersion) === 0;
+      const isFirstVersionOlder = compareVersions(effectiveFirstVersion, appLatestVersion) < 0;
       
       if (isFirstVersionLatest && daysSinceFirstSeen <= 7) {
-        markdownContent += `> - 🔴 **这是一个新问题**: 首现于 ${FirstVersion}，且在最近7天内出现\n`;
+        markdownContent += `> - 🔴 **这是一个新问题**: 首现于 ${effectiveFirstVersion}，且在最近7天内出现\n`;
       } else if (isFirstVersionLatest && daysSinceFirstSeen <= 30) {
-        markdownContent += `> - 🟡 **这是一个较新问题**: 首现于 ${FirstVersion}，约 ${daysSinceFirstSeen} 天前\n`;
+        markdownContent += `> - 🟡 **这是一个较新问题**: 首现于 ${effectiveFirstVersion}，约 ${daysSinceFirstSeen} 天前\n`;
       } else if (isFirstVersionOlder) {
-        markdownContent += `> - 🟢 **这是一个老问题**: 首现于 ${FirstVersion}，应用最新版本为 ${appLatestVersion}\n`;
+        markdownContent += `> - 🟢 **这是一个老问题**: 首现于 ${effectiveFirstVersion}，应用最新版本为 ${appLatestVersion}\n`;
       } else {
-        markdownContent += `> - ⏳ **这是一个历史问题**: 首现于 ${FirstVersion}，已存在 ${daysSinceFirstSeen} 天\n`;
+        markdownContent += `> - ⏳ **这是一个历史问题**: 首现于 ${effectiveFirstVersion}，已存在 ${daysSinceFirstSeen} 天\n`;
       }
     }
     markdownContent += `\n`;
@@ -3185,14 +3190,14 @@ async function analyzeCrash(
   
   // 性能分析：简化版本分析
   if (isPerformanceAnalysis) {
-    if (FirstVersion) {
+    if (effectiveFirstVersion) {
       markdownContent += `> **版本信息**\n`;
-      markdownContent += `> - 首现版本: ${FirstVersion}\n`;
-      if (crashDetail?.Model?.FirstTime) {
-        markdownContent += `> - 首次出现时间: ${crashDetail.Model.FirstTime}\n`;
+      markdownContent += `> - 首现版本: ${effectiveFirstVersion}\n`;
+      if (effectiveFirstTime) {
+        markdownContent += `> - 首次出现时间: ${effectiveFirstTime}\n`;
       }
-      if (crashDetail?.Model?.LatestTime) {
-        markdownContent += `> - 最近出现时间: ${crashDetail.Model.LatestTime}\n`;
+      if (effectiveLatestTime) {
+        markdownContent += `> - 最近出现时间: ${effectiveLatestTime}\n`;
       }
       markdownContent += `\n`;
     }
