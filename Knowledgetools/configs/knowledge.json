@@ -1,0 +1,6 @@
+{
+  "sourceCodeDir": "./data/source-code",
+  "knowledgeBaseDir": "./data/knowledge-base",
+  "knowledgeSourcesDir": "./data/knowledge-sources",
+  "autoAnalyze": false
+}

@@ -1,0 +1,49 @@
+{
+  "title": "游戏化里面宠物的装扮不见了",
+  "category": "游戏化",
+  "priority": "high",
+  "status": "active",
+  "tags": ["宠物", "装扮", "数据", "游戏化"],
+  "problemDescription": "用户反馈在游戏化模块中，购买或获得的宠物装扮在重新登录后消失了，无法正常显示和使用。",
+  "reproductionSteps": [
+    "用户登录系统",
+    "进入游戏化模块",
+    "购买或获得宠物装扮",
+    "确认装扮已装备",
+    "退出登录",
+    "重新登录系统",
+    "进入游戏化模块查看宠物装扮"
+  ],
+  "rootCause": "经过排查，发现问题出在宠物装扮数据的保存逻辑上。在用户装备装扮时，只更新了内存中的数据，但没有及时将数据持久化到数据库中。当用户重新登录时，系统从数据库加载数据，导致用户看到的是旧数据。",
+  "businessLogic": "宠物装扮功能涉及用户装备、数据持久化和登录加载三个主要环节。装备装扮时需要同时更新内存和数据库，确保数据一致性。",
+  "solution": [
+    {
+      "title": "修改装备装扮的保存逻辑",
+      "description": "在用户装备宠物装扮时，立即调用数据库保存接口，确保数据持久化。",
+      "codeReference": "// 在 PetDecorationService.js 中\nasync equipDecoration(userId, decorationId) {\n  const decoration = await this.getDecoration(decorationId);\n  await this.userPetRepository.updateDecoration(userId, decorationId);\n  // 添加立即保存逻辑\n  await this.userPetRepository.flush();\n  return decoration;\n}"
+    },
+    {
+      "title": "添加数据变更监听器",
+      "description": "在用户数据发生变更时，自动触发保存操作，避免遗漏。",
+      "codeReference": "// 添加数据变更监听器\nthis.userPetRepository.on('change', async (data) => {\n  await this.userPetRepository.save(data);\n});"
+    },
+    {
+      "title": "增加数据同步校验",
+      "description": "用户登录时，增加内存数据与数据库数据的一致性校验。",
+      "codeReference": "// 在 UserLoginService.js 中\nasync verifyDataConsistency(userId) {\n  const memoryData = this.cache.get(userId);\n  const dbData = await this.userRepository.findById(userId);\n  if (memoryData.decorations !== dbData.decorations) {\n    await this.syncData(userId, dbData);\n  }\n}"
+    }
+  ],
+  "relatedBusiness": ["宠物系统", "装扮商城", "用户登录"],
+  "relatedKnowledge": ["pet-system", "decoration-shop", "user-login"],
+  "codeLocation": {
+    "filePath": "src/services/PetDecorationService.js",
+    "lineNumber": 45,
+    "gitUrl": "https://gitlab.com/example/project/-/blob/main/src/services/PetDecorationService.js#L45"
+  },
+  "prevention": "1. 所有涉及用户数据变更的操作都必须立即持久化到数据库\n2. 添加单元测试覆盖数据持久化场景\n3. 定期进行数据一致性检查\n4. 增加数据变更的日志记录",
+  "notes": [
+    "此问题已影响约 5% 的活跃用户",
+    "建议优先修复此问题，再发布新版本",
+    "需要配合前端添加数据加载动画，提升用户体验"
+  ]
+}

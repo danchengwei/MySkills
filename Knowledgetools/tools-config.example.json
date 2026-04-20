@@ -1,0 +1,12 @@
+{
+  "knowledgeSourcesDir": "/Users/tal/workSpace/TraeProject/knowledge-base-tool/import/knowledge-sources",
+  "caseKnowledgeDir": "/Users/tal/workSpace/TraeProject/knowledge-base-tool/import/case-knowledge",
+  "sourceCodeDir": "/Users/tal/workSpace/TraeProject/knowledge-base-tool/data/source-code",
+  "gitlab": {
+    "baseUrl": "https://gitlab.com",
+    "apiVersion": "v4",
+    "projectId": "",
+    "accessToken": "",
+    "defaultBranch": "main"
+  }
+}
